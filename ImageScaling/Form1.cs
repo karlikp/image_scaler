@@ -17,6 +17,9 @@ namespace ImageScaling
         [DllImport("C:\\Users\\Ryzen\\Desktop\\Git_repos\\image_scaler\\x64\\Debug\\ImageScaling_Cpp.dll")]
         public static extern void FreeImageMemory(IntPtr memory);
 
+        [DllImport(@"C:\Users\Ryzen\Desktop\Git_repos\image_scaler\x64\Debug\ImageScaling_Asm.dll ")]
+        static extern int MyProc1(int a, int b);
+
 
         public Form1()
         {
@@ -55,9 +58,13 @@ namespace ImageScaling
                 }
             }
 
+            int x = 5, y = 3;
+            int retVal = MyProc1(x, y);
+            Console.WriteLine(retVal);
+
         }
 
-       void saveImage()
+        void saveImage()
         {
             try
             {

@@ -1,1 +1,2 @@
-﻿
+﻿C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppBuild.targets(1192,14): error MSB4023: Cannot evaluate the item metadata "%(RootDir)". The item metadata "%(FullPath)" cannot be applied to the path "ImageScaling_Asm.exe
+C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VC\v170\Microsoft.CppBuild.targets(1192,14): error MSB4023: ". Illegal characters in path.
