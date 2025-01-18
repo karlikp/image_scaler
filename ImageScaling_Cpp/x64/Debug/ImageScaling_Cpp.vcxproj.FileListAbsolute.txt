@@ -1,0 +1,1 @@
+C:\Users\Ryzen\Desktop\Git_repos\JA_proj\ImageScaling_Cpp\x64\Debug\ImageScaling_Cpp.vcxproj.AssemblyReference.cache

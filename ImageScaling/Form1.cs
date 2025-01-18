@@ -1,16 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
 using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.IO;
 using System.Windows.Forms;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.Button;
-using System.Reflection.Emit;
 using System.Runtime.InteropServices;
+using System.Diagnostics;
 
 namespace ImageScaling
 {
@@ -20,7 +12,11 @@ namespace ImageScaling
         //public static extern void BoxBlurAsm();
 
         [DllImport("C:\\Users\\Ryzen\\Desktop\\Git_repos\\JA_proj\\x64\\Debug\\ImageScaling_Cpp.dll")]
-        public static extern Bitmap ScaleImage(const Bitmap& bitmapPhoto, int originalWidth, int originalHeight, int newWidth, int newHeight);
+        public static extern IntPtr ScaleImageCpp(byte[] bitmapPhoto, int originalWidth, int originalHeight, int newWidth, int newHeight);
+
+        [DllImport("C:\\Users\\Ryzen\\Desktop\\Git_repos\\JA_proj\\x64\\Debug\\ImageScaling_Cpp.dll")]
+        public static extern void FreeImageMemory(IntPtr memory);
+
 
         public Form1()
         {
@@ -29,6 +25,9 @@ namespace ImageScaling
 
         private Bitmap bitmapPhoto;
         private Bitmap bitmapScaled;
+
+        private int newWidth;
+        private int newHeight;
 
         private bool CppCheck;
         private bool AsmCheck;
@@ -46,6 +45,8 @@ namespace ImageScaling
                 {
                     // Wczytanie obrazu w różnych formatach jako Bitmap
                     bitmapPhoto = new Bitmap(pathPhoto);
+                    currentWidth.Text = (bitmapPhoto.Width).ToString();
+                    currentHeight.Text = (bitmapPhoto.Height).ToString();
 
                 }
                 catch (Exception ex)
@@ -56,7 +57,7 @@ namespace ImageScaling
 
         }
 
-        private void btnSave_Click(object sender, EventArgs e)
+       void saveImage()
         {
             try
             {
@@ -84,29 +85,6 @@ namespace ImageScaling
             }
         }
 
-        private void btnPerform_Click(object sender, EventArgs e)
-        {
-            if (bitmapPhoto == null)
-            {
-                MessageBox.Show("No image loaded. Please choose an image first.");
-                return;
-            }
-
-            try
-            {
-                // Przykładowe nowe wymiary dla obrazu
-                int newWidth = 200;  // Nowa szerokość
-                int newHeight = 200; // Nowa wysokość
-
-                // Skalowanie obrazu
-                bitmapScaled = ScaleBitmap(bitmapPhoto, newWidth, newHeight);
-            
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error while scaling photo: {ex.Message}");
-            }
-        }
 
         private Bitmap ScaleBitmap(Bitmap bitmap, int newWidth, int newHeight)
         {
@@ -117,6 +95,94 @@ namespace ImageScaling
                 g.DrawImage(bitmap, 0, 0, newWidth, newHeight);
             }
             return scaledBitmap;
+        }
+
+        private void btnFormatPhoto_Click(object sender, EventArgs e)
+        {
+            int.TryParse(widthTextBox.Text, out newWidth);
+            int.TryParse(heightTextBox.Text, out newHeight);
+
+            Console.WriteLine(newWidth);
+            Console.WriteLine(newHeight);
+
+            if (bitmapPhoto == null)
+            {
+                MessageBox.Show("No image provided.");
+                return;
+            }
+
+            if (CppCheck)
+            {
+
+                try
+                {
+                    byte[] inputPixels = BitmapToByteArray(bitmapPhoto);
+
+                    Stopwatch stopwatch = new Stopwatch();
+                    stopwatch.Start();
+
+                    // Wywołanie funkcji DLL
+                    IntPtr result = ScaleImageCpp(inputPixels, bitmapPhoto.Width, bitmapPhoto.Height, newWidth, newHeight);
+
+                    stopwatch.Stop();
+
+                    double elapsedMicroseconds = stopwatch.ElapsedTicks / (Stopwatch.Frequency / 1_000_000.0);
+                    labelCppTime.Text = elapsedMicroseconds.ToString();
+
+                    if (result != IntPtr.Zero)
+                    {
+                        // Alokacja tablicy bajtów w C#
+                        int outputSize = (newWidth * newHeight * 3); // Assuming 24bpp BGR format
+                        byte[] outputPixels = new byte[outputSize];
+
+                        // Kopiowanie danych z niezarządzanej pamięci
+                        Marshal.Copy(result, outputPixels, 0, outputSize);
+
+                        // Konwersja na obiekt Bitmap
+                        bitmapScaled = ByteArrayToBitmap(outputPixels, newWidth, newHeight);
+
+                        // Zwolnienie pamięci po stronie C++
+                        FreeImageMemory(result);
+
+                        MessageBox.Show("Image scaled successfully using C++.");
+
+                        saveImage();
+                    }
+                    else
+                    {
+                        MessageBox.Show("Scaling failed.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Error while scaling photo: {ex.Message}");
+                }
+            }
+        }
+
+        private byte[] BitmapToByteArray(Bitmap bitmap)
+        {
+            Rectangle rect = new Rectangle(0, 0, bitmap.Width, bitmap.Height);
+            System.Drawing.Imaging.BitmapData bitmapData = bitmap.LockBits(rect, System.Drawing.Imaging.ImageLockMode.ReadOnly, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+
+            int bytes = Math.Abs(bitmapData.Stride) * bitmap.Height;
+            byte[] rgbValues = new byte[bytes];
+            Marshal.Copy(bitmapData.Scan0, rgbValues, 0, bytes);
+            bitmap.UnlockBits(bitmapData);
+
+            return rgbValues;
+        }
+
+        private Bitmap ByteArrayToBitmap(byte[] pixelData, int width, int height)
+        {
+            Bitmap bitmap = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+            Rectangle rect = new Rectangle(0, 0, width, height);
+            System.Drawing.Imaging.BitmapData bitmapData = bitmap.LockBits(rect, System.Drawing.Imaging.ImageLockMode.WriteOnly, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+
+            Marshal.Copy(pixelData, 0, bitmapData.Scan0, pixelData.Length);
+            bitmap.UnlockBits(bitmapData);
+
+            return bitmap;
         }
 
         private void Form1_Load(object sender, EventArgs e)
@@ -172,5 +238,7 @@ namespace ImageScaling
                 AsmCheck = false;
             }
         }
+
+        
     }
 }

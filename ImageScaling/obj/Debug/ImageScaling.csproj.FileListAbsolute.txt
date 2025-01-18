@@ -1,0 +1,10 @@
+C:\Users\Ryzen\Desktop\Git_repos\JA_proj\ImageScaling\bin\Debug\ImageScaling.exe.config
+C:\Users\Ryzen\Desktop\Git_repos\JA_proj\ImageScaling\bin\Debug\ImageScaling.exe
+C:\Users\Ryzen\Desktop\Git_repos\JA_proj\ImageScaling\bin\Debug\ImageScaling.pdb
+C:\Users\Ryzen\Desktop\Git_repos\JA_proj\ImageScaling\obj\Debug\ImageScaling.csproj.AssemblyReference.cache
+C:\Users\Ryzen\Desktop\Git_repos\JA_proj\ImageScaling\obj\Debug\ImageScaling.Form1.resources
+C:\Users\Ryzen\Desktop\Git_repos\JA_proj\ImageScaling\obj\Debug\ImageScaling.Properties.Resources.resources
+C:\Users\Ryzen\Desktop\Git_repos\JA_proj\ImageScaling\obj\Debug\ImageScaling.csproj.GenerateResource.cache
+C:\Users\Ryzen\Desktop\Git_repos\JA_proj\ImageScaling\obj\Debug\ImageScaling.csproj.CoreCompileInputs.cache
+C:\Users\Ryzen\Desktop\Git_repos\JA_proj\ImageScaling\obj\Debug\ImageScaling.exe
+C:\Users\Ryzen\Desktop\Git_repos\JA_proj\ImageScaling\obj\Debug\ImageScaling.pdb

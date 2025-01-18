@@ -10,20 +10,10 @@
 #define IMAGE_SCALER_API __declspec(dllimport)
 #endif
 
-// Struktura pikseli w formacie BMP
-struct Pixel {
-    unsigned char b, g, r;
-};
+// Deklaracja funkcji skaluj¹cej obraz
+extern "C" IMAGE_SCALER_API uint8_t * ScaleImageCpp(uint8_t * bitmapPhoto, int originalWidth, int originalHeight, int newWidth, int newHeight);
 
-// Struktura Bitmap do przechowywania obrazu BMP
-struct Bitmap {
-    std::vector<unsigned char> header; // Nag³ówek BMP
-    std::vector<Pixel> pixels;         // Dane pikseli
-    int width;                         // Szerokoœæ obrazu
-    int height;                        // Wysokoœæ obrazu
-};
-
-// Deklaracja funkcji skaluj¹cej
-extern "C" IMAGE_SCALER_API Bitmap ScaleImage(const Bitmap & bitmapPhoto, int originalWidth, int originalHeight, int newWidth, int newHeight);
+// Deklaracja funkcji do zwalniania pamiêci alokowanej w DLL
+extern "C" IMAGE_SCALER_API void FreeImageMemory(uint8_t * memory);
 
 #endif // IMAGE_SCALER_H
