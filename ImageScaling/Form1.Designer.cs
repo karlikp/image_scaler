@@ -41,7 +41,7 @@
             this.label1 = new System.Windows.Forms.Label();
             this.label2 = new System.Windows.Forms.Label();
             this.checkBoxCpp = new System.Windows.Forms.CheckBox();
-            this.checkBox1 = new System.Windows.Forms.CheckBox();
+            this.checkBoxAsm = new System.Windows.Forms.CheckBox();
             this.btnFormatImage = new System.Windows.Forms.Button();
             this.labelInfo2 = new System.Windows.Forms.Label();
             this.btmExit = new System.Windows.Forms.Button();
@@ -185,17 +185,17 @@
             this.checkBoxCpp.UseVisualStyleBackColor = true;
             this.checkBoxCpp.CheckedChanged += new System.EventHandler(this.checkBox_Cpp_CheckedChanged);
             // 
-            // checkBox1
+            // checkBoxAsm
             // 
-            this.checkBox1.AutoSize = true;
-            this.checkBox1.Font = new System.Drawing.Font("Microsoft Sans Serif", 11F);
-            this.checkBox1.Location = new System.Drawing.Point(216, 299);
-            this.checkBox1.Name = "checkBox1";
-            this.checkBox1.Size = new System.Drawing.Size(97, 22);
-            this.checkBox1.TabIndex = 22;
-            this.checkBox1.Text = "Assembler";
-            this.checkBox1.UseVisualStyleBackColor = true;
-            this.checkBox1.CheckedChanged += new System.EventHandler(this.checkBox_Asm_CheckedChanged);
+            this.checkBoxAsm.AutoSize = true;
+            this.checkBoxAsm.Font = new System.Drawing.Font("Microsoft Sans Serif", 11F);
+            this.checkBoxAsm.Location = new System.Drawing.Point(216, 299);
+            this.checkBoxAsm.Name = "checkBoxAsm";
+            this.checkBoxAsm.Size = new System.Drawing.Size(97, 22);
+            this.checkBoxAsm.TabIndex = 22;
+            this.checkBoxAsm.Text = "Assembler";
+            this.checkBoxAsm.UseVisualStyleBackColor = true;
+            this.checkBoxAsm.CheckedChanged += new System.EventHandler(this.checkBox_Asm_CheckedChanged);
             // 
             // btnFormatImage
             // 
@@ -313,7 +313,7 @@
             this.Controls.Add(this.label1);
             this.Controls.Add(this.label2);
             this.Controls.Add(this.checkBoxCpp);
-            this.Controls.Add(this.checkBox1);
+            this.Controls.Add(this.checkBoxAsm);
             this.Controls.Add(this.btnFormatImage);
             this.Controls.Add(this.labelInfo2);
             this.Controls.Add(this.btnChooseImage);
@@ -340,7 +340,7 @@
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.Label label2;
         private System.Windows.Forms.CheckBox checkBoxCpp;
-        private System.Windows.Forms.CheckBox checkBox1;
+        private System.Windows.Forms.CheckBox checkBoxAsm;
         private System.Windows.Forms.Button btnFormatImage;
         private System.Windows.Forms.Label labelInfo2;
         private System.Windows.Forms.Button btmExit;

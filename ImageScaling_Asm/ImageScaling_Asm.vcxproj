@@ -126,11 +126,14 @@
       <EnableUAC>false</EnableUAC>
       <ModuleDefinitionFile>ImageScaler.def</ModuleDefinitionFile>
       <NoEntryPoint>true</NoEntryPoint>
-      <AdditionalDependencies>msvcrt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>msvcrt.lib;kernel32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalOptions>/DEFAULTLIB:msvcrt.lib
+ %(AdditionalOptions)</AdditionalOptions>
+      <AssemblyDebug>true</AssemblyDebug>
     </Link>
     <CustomBuildStep>
-      <Command>ml /c /coff %(FullPath)
-link /subsystem:console %(Filename).obj msvcrt.lib</Command>
+      <Command>
+      </Command>
     </CustomBuildStep>
     <CustomBuildStep>
       <Outputs>%(Filename).exe

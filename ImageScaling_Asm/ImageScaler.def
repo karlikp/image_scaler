@@ -1,4 +1,4 @@
 LIBRARY ImageScaling_Asm
 EXPORTS 
 	ScaleImageAsm
-	;FreeImageMemory
+	

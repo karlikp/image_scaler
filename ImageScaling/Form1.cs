@@ -18,7 +18,7 @@ namespace ImageScaling
         public static extern void FreeImageMemory(IntPtr memory);
 
         [DllImport(@"C:\Users\Ryzen\Desktop\Git_repos\image_scaler\x64\Debug\ImageScaling_Asm.dll ")]
-        static extern int MyProc1(int a, int b);
+        public static extern IntPtr ScaleImageAsm(byte[] bitmapPhoto, int originalWidth, int originalHeight, int newWidth, int newHeight);
 
 
         public Form1()
@@ -58,9 +58,6 @@ namespace ImageScaling
                 }
             }
 
-            int x = 5, y = 3;
-            int retVal = MyProc1(x, y);
-            Console.WriteLine(retVal);
 
         }
 
@@ -120,50 +117,102 @@ namespace ImageScaling
 
             if (CppCheck)
             {
+                FormatCpp();
+            }
+            if (AsmCheck)
+            {
+                FormatAsm();
+            }
+        }
 
-                try
+        private void FormatCpp()
+        {
+            try
+            {
+                byte[] inputPixels = BitmapToByteArray(bitmapPhoto);
+
+                Stopwatch stopwatch = new Stopwatch();
+                stopwatch.Start();
+
+                // Wywołanie funkcji DLL
+                IntPtr result = ScaleImageCpp(inputPixels, bitmapPhoto.Width, bitmapPhoto.Height, newWidth, newHeight);
+
+                stopwatch.Stop();
+
+                double elapsedMicroseconds = stopwatch.ElapsedTicks / (Stopwatch.Frequency / 1_000_000.0);
+                labelCppTime.Text = elapsedMicroseconds.ToString();
+
+                if (result != IntPtr.Zero)
                 {
-                    byte[] inputPixels = BitmapToByteArray(bitmapPhoto);
+                    // Alokacja tablicy bajtów w C#
+                    int outputSize = (newWidth * newHeight * 3); // Assuming 24bpp BGR format
+                    byte[] outputPixels = new byte[outputSize];
 
-                    Stopwatch stopwatch = new Stopwatch();
-                    stopwatch.Start();
+                    // Kopiowanie danych z niezarządzanej pamięci
+                    Marshal.Copy(result, outputPixels, 0, outputSize);
 
-                    // Wywołanie funkcji DLL
-                    IntPtr result = ScaleImageCpp(inputPixels, bitmapPhoto.Width, bitmapPhoto.Height, newWidth, newHeight);
+                    // Konwersja na obiekt Bitmap
+                    bitmapScaled = ByteArrayToBitmap(outputPixels, newWidth, newHeight);
 
-                    stopwatch.Stop();
+                    // Zwolnienie pamięci po stronie C++
+                    FreeImageMemory(result);
 
-                    double elapsedMicroseconds = stopwatch.ElapsedTicks / (Stopwatch.Frequency / 1_000_000.0);
-                    labelCppTime.Text = elapsedMicroseconds.ToString();
+                    MessageBox.Show("Image scaled successfully using C++.");
 
-                    if (result != IntPtr.Zero)
-                    {
-                        // Alokacja tablicy bajtów w C#
-                        int outputSize = (newWidth * newHeight * 3); // Assuming 24bpp BGR format
-                        byte[] outputPixels = new byte[outputSize];
-
-                        // Kopiowanie danych z niezarządzanej pamięci
-                        Marshal.Copy(result, outputPixels, 0, outputSize);
-
-                        // Konwersja na obiekt Bitmap
-                        bitmapScaled = ByteArrayToBitmap(outputPixels, newWidth, newHeight);
-
-                        // Zwolnienie pamięci po stronie C++
-                        FreeImageMemory(result);
-
-                        MessageBox.Show("Image scaled successfully using C++.");
-
-                        saveImage();
-                    }
-                    else
-                    {
-                        MessageBox.Show("Scaling failed.");
-                    }
+                    saveImage();
                 }
-                catch (Exception ex)
+                else
                 {
-                    MessageBox.Show($"Error while scaling photo: {ex.Message}");
+                    MessageBox.Show("Scaling failed.");
                 }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error while scaling photo: {ex.Message}");
+            }
+        }
+        private void FormatAsm()
+        {
+            try
+            {
+                byte[] inputPixels = BitmapToByteArray(bitmapPhoto);
+
+                Stopwatch stopwatch = new Stopwatch();
+                stopwatch.Start();
+
+                MessageBox.Show("Calling ScaleImageAsm...");
+                // Wywołanie funkcji DLL
+                IntPtr result = ScaleImageAsm(inputPixels, bitmapPhoto.Width, bitmapPhoto.Height, newWidth, newHeight);
+
+                stopwatch.Stop();
+
+                double elapsedMicroseconds = stopwatch.ElapsedTicks / (Stopwatch.Frequency / 1_000_000.0);
+                labelAsmTime.Text = elapsedMicroseconds.ToString();
+
+                if (result != IntPtr.Zero)
+                {
+                    // Alokacja tablicy bajtów w C#
+                    int outputSize = (newWidth * newHeight * 3); // Assuming 24bpp BGR format
+                    byte[] outputPixels = new byte[outputSize];
+
+                    // Kopiowanie danych z niezarządzanej pamięci
+                    Marshal.Copy(result, outputPixels, 0, outputSize);
+
+                    // Konwersja na obiekt Bitmap
+                    bitmapScaled = ByteArrayToBitmap(outputPixels, newWidth, newHeight);
+
+                    MessageBox.Show("Image scaled successfully using C++.");
+
+                    saveImage();
+                }
+                else
+                {
+                    MessageBox.Show("Scaling failed.");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error while scaling photo: {ex.Message}");
             }
         }
 
@@ -236,7 +285,7 @@ namespace ImageScaling
 
         private void checkBox_Asm_CheckedChanged(object sender, EventArgs e)
         {
-            if (checkBoxCpp.Checked)
+            if (checkBoxAsm.Checked)
             {
                 AsmCheck = true;
             }
