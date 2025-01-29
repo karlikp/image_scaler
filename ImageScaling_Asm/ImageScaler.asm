@@ -1,262 +1,118 @@
-; ==============================
-; Sekcja danych
-; ==============================
-.DATA
-resizedBitmap QWORD ? ; Bufor dla nowego obrazu (opcjonalnie)
+; ------------------------------------------------------------------------------
+; Mo¿esz wy³¹czyæ mapowanie wielkoœci liter, jeœli u¿ywasz MASM:
+option casemap:none
 
-; ==============================
-; Deklaracje procedur zewnêtrznych
-; ==============================
-EXTERN VirtualAlloc:PROC
-
-; ==============================
-; Sekcja kodu
-; ==============================
-.CODE
+.code
 
 PUBLIC ScaleImageAsm
 
-; -----------------------------------------------------------
-; Funkcja: ScaleImageAsm
-; -----------------------------------------------------------
-; Argumenty (Microsoft x64):
-;   RCX - bitmapPhoto       (wskaŸnik do oryginalnego obrazu)
-;   RDX - originalWidth     (szerokoœæ oryginalna, int)
-;   R8  - originalHeight    (wysokoœæ oryginalna, int)
-;   R9  - newWidth          (nowa szerokoœæ, int)
-;   (5-ty argument)         (newHeight, int) - na stosie
-;
-; Zak³adamy, ¿e prototyp w C++ to:
-;   extern "C" unsigned char* ScaleImageAsm(
-;       unsigned char* bitmapPhoto,
-;       int originalWidth,
-;       int originalHeight,
-;       int newWidth,
-;       int newHeight
-;   );
-;
-; Zwraca: 
-;   - wskaŸnik do nowego obrazu 
-;   - NULL (0), jeœli wyst¹pi³ b³¹d
-; -----------------------------------------------------------
-
+; ------------------------------------------------------------------------------
+; ScaleImageAsm PROC
+; Parametry w MS x64 ABI:
+;   RCX -> input   (const uint32_t*)
+;   RDX -> output  (uint32_t*)
+;   R8  -> iWidth  (size_t)
+;   R9  -> iHeight (size_t)
+;   [rsp+32] -> oWidth  (size_t)
+;   [rsp+40] -> oHeight (size_t)
+; ------------------------------------------------------------------------------
 ScaleImageAsm PROC
-    ; -----------------------------------------------------
-    ; Prolog
-    ; -----------------------------------------------------
-    push    rbp
-    mov     rbp, rsp
-    sub     rsp, 64            ; rezerwujemy miejsce na zmienne lokalne
 
-    ; -----------------------------------------------------
-    ; Zapisujemy 4 g³ówne argumenty do pamiêci lokalnej
-    ; -----------------------------------------------------
-    mov     [rsp +  0], rcx    ; [rsp +  0] = bitmapPhoto
-    mov     [rsp +  8], rdx    ; [rsp +  8] = originalWidth
-    mov     [rsp + 16], r8     ; [rsp + 16] = originalHeight
-    mov     [rsp + 24], r9     ; [rsp + 24] = newWidth
+        ; Rezerwujemy 32 bajty shadow space (wymóg ABI Microsoft x64)
+        sub     rsp, 32
 
-    ; -----------------------------------------------------
-    ; Wczytanie 5. argumentu (newHeight, int)
-    ; UWAGA: W Windows x64 kolejne argumenty (po 4.) trafiaj¹ na stos.
-    ;        Dlatego musimy pobraæ *tylko* 32 bity z w³aœciwej pozycji.
-    ;        Je¿eli w C++ mamy 'int newHeight', to musimy zrobiæ mov eax, [rbp+?].
-    ; -----------------------------------------------------
+        ; Pobranie 5. i 6. argumentu ze stosu
+        mov     r10d, [rbp + 48]      ; r10 = oWidth
+        mov     r11d, [rbp + 56]      ; r11 = oHeight
 
-    ; Najczêœciej 5-ty argument (typu 32-bit int) jest w [rbp + 48],
-    ; ale to zale¿y od uk³adu stosu w czasie wywo³ania.
-    ; W praktyce, przy "push rbp / mov rbp, rsp", 
-    ;   [rbp +  0] = poprzedni RBP
-    ;   [rbp +  8] = adres powrotny
-    ;   [rbp + 16..] = home space/rejestry
-    ;   itd.
-    ;
-    ; Jeœli Twój kompilator/œrodowisko potwierdza, ¿e 5-ty argument
-    ; jest pod [rbp + 48], wczytujemy go tak:
-    ;
+        ; Teraz chcemy odwzorowaæ stare rejestry:
+        ;   (stary kod zak³ada³: rdi=input, rsi=output, rdx=iWidth, rcx=iHeight, r8=oWidth, r9=oHeight)
+        ;
+        ; W MS x64:
+        ;   RCX = input, RDX = output, R8 = iWidth, R9 = iHeight, r10 = oWidth, r11 = oHeight
+        ;
+        ; Dlatego „przek³adamy” je w taki sposób:
+        mov     rdi, rcx    ; rdi = input
+        mov     rsi, rdx    ; rsi = output
+        mov     rdx, r8     ; iWidth
+        mov     rcx, r9     ; iHeight
+        mov     r8,  r10    ; oWidth
+        mov     r9,  r11    ; oHeight
 
-    mov     eax, DWORD PTR [rbp + 48] ; za³aduj 32 bity newHeight do EAX
-    mov     [rsp + 32], rax           ; zapisz w [rsp+32] (jako int, z wyzerowan¹ gór¹ RAX)
+        ; ------------------------------------------------------------------------------
+        ; Dalej kod mo¿e byæ niemal identyczny jak w wersji System V
+        ; ------------------------------------------------------------------------------
+        ; xRatio = float(iWidth) / oWidth
+        cvtsi2ss xmm0, rdx       ; xmm0 = (float)iWidth
+        cvtsi2ss xmm1, r8        ; xmm1 = (float)oWidth
+        divss   xmm0, xmm1       ; xmm0 = xRatio
 
-    ; ------------------------------
-    ; Sprawdzenie warunków b³êdnych (NULL, <= 0, itp.)
-    ; ------------------------------
+        ; yRatio = float(iHeight) / oHeight
+        cvtsi2ss xmm2, rcx       ; xmm2 = (float)iHeight
+        cvtsi2ss xmm3, r9        ; xmm3 = (float)oHeight
+        divss   xmm2, xmm3       ; xmm2 = yRatio
 
-    ; 1. bitmapPhoto (64-bit wskaŸnik), sprawdzamy != NULL
-    mov   rax, [rsp +  0]    ; wczytujemy wskaŸnik
-    test  rax, rax           ; sprawdzamy, czy jest równy 0
-    jz    error              ; jeœli 0 -> b³¹d
+        ; r10 = y (pêtla zewnêtrzna)
+        xor     r10, r10         ; y = 0
 
-    ; 2. originalWidth (32-bit int), sprawdzamy > 0
-    mov   eax, [rsp +  8]    ; wczytujemy 32 bity do EAX
-    test  eax, eax           ; sprawdzamy znak i zero
-    jle   error              ; jeœli <= 0 -> b³¹d
+    outer_loop_y:
+        cmp     r10, r9          ; if (y >= oHeight) -> end
+        jae     end_function
 
-    ; 3. originalHeight (32-bit int), sprawdzamy > 0
-    mov   eax, [rsp + 16]
-    test  eax, eax
-    jle   error
+        xor     r11, r11         ; x = 0 (pêtla wewnêtrzna)
 
-    ; 4. newWidth (32-bit int), sprawdzamy > 0
-    mov   eax, [rsp + 24]
-    test  eax, eax
-    jle   error
+    inner_loop_x:
+        cmp     r11, r8          ; if (x >= oWidth) -> next y
+        jae     end_inner_loop
 
-    ; 5. newHeight (32-bit int), sprawdzamy > 0
-    mov   eax, [rsp + 32]
-    test  eax, eax
-    jle   error
+        ;1.1 nearestX = (int)(x * xRatio)
+        cvtsi2ss xmm4, r11
+        mulss   xmm4, xmm0
+        cvttss2si r12, xmm4
 
-    ; -----------------------------------------------------
-    ; newRowSize = (newWidth * 3 + 3) & ~3
-    ; -----------------------------------------------------
-    mov     rax, [rsp + 24]    ; RAX = newWidth
-    imul    rax, 3             ; RAX = newWidth * 3
-    add     rax, 3
-    and     rax, -4            ; wyrównanie w dó³ (do wielokrotnoœci 4)
-    mov     [rsp + 40], rax    ; newRowSize
+        ;2.1 nearestY = (int)(y * yRatio)
+        cvtsi2ss xmm5, r10
+        mulss   xmm5, xmm2
+        cvttss2si r13, xmm5
 
-    ; -----------------------------------------------------
-    ; newPixelArraySize = newRowSize * newHeight
-    ; -----------------------------------------------------
-    mov     rbx, rax           ; rbx = newRowSize
-    mov     rax, [rsp + 32]    ; rax = newHeight
-    imul    rax, rbx           ; rax = newRowSize * newHeight
-    test    rax, rax
-    jle     error
+        ;1.2 nearestX = min(nearestX, iWidth - 1)
+        cmp     r12, rdx
+        jb      no_clamp_x
+        lea     r12, [rdx - 1]
+    no_clamp_x:
 
-    mov     [rsp + 48], rax    ; newPixelArraySize
+        ;2.2 nearestY = min(nearestY, iHeight - 1)
+        cmp     r13, rcx
+        jb      no_clamp_y
+        lea     r13, [rcx - 1]
+    no_clamp_y:
 
-    ; -----------------------------------------------------
-    ; Wywo³anie VirtualAlloc (alokacja pamiêci)
-    ; W MS x64 parametry s¹ w rejestrach: rcx, rdx, r8, r9
-    ;
-    ; LPVOID VirtualAlloc(
-    ;     LPVOID lpAddress,    // rcx
-    ;     SIZE_T dwSize,       // rdx
-    ;     DWORD  flAllocationType, // r8
-    ;     DWORD  flProtect     // r9
-    ; );
-    ; -----------------------------------------------------
-    sub     rsp, 32            ; shadow space (zalecane)
-    mov     rcx, 0             ; lpAddress = NULL
-    mov     rdx, rax           ; dwSize = newPixelArraySize
-    mov     r8,  4096          ; MEM_COMMIT
-    mov     r9,  64            ; PAGE_READWRITE
-    call    VirtualAlloc
-    add     rsp, 32
+        ;3 Za³aduj pixel z input[nearestY * iWidth + nearestX]
+        mov     rax, r13
+        imul    rax, rdx
+        add     rax, r12
+        mov     ebx, DWORD PTR [rdi + rax*4]  ; ebx = input[...]
+        
+        ;4 Zapisz pixel do output[y * oWidth + x]
+        mov     rax, r10
+        imul    rax, r8
+        add     rax, r11
+        mov     DWORD PTR [rsi + rax*4], ebx  ; output[...]
 
-    test    rax, rax
-    jz      error
+        ; x++
+        inc     r11
+        jmp     inner_loop_x
 
-    ; Zapisujemy wskaŸnik do zaalokowanej pamiêci
-    mov     [rsp + 56], rax    ; resizedBitmap
+    end_inner_loop:
+        ; y++
+        inc     r10
+        jmp     outer_loop_y
 
-    ; -----------------------------------------------------
-    ; Skalowanie metod¹ najbli¿szego s¹siada
-    ; -----------------------------------------------------
-    xor     rcx, rcx           ; y = 0
-
-outer_loop:
-    cmp     rcx, [rsp + 32]    ; y < newHeight ?
-    jge     end_outer_loop
-
-    xor     rdx, rdx           ; x = 0
-
-inner_loop:
-    cmp     rdx, [rsp + 24]    ; x < newWidth ?
-    jge     end_inner_loop
-
-    ; ---------------------------
-    ; srcX = (x * originalWidth) / newWidth
-    ; ---------------------------
-    mov     rax, rdx
-    imul    rax, [rsp +  8]    ; x * originalWidth
-    cqo
-    idiv    qword ptr [rsp + 24]  ; / newWidth
-    mov     rsi, rax           ; srcX
-
-    ; ---------------------------
-    ; srcY = (y * originalHeight) / newHeight
-    ; ---------------------------
-    mov     rax, rcx
-    imul    rax, [rsp + 16]    ; y * originalHeight
-    cqo
-    idiv    qword ptr [rsp + 32]  ; / newHeight
-    mov     rdi, rax           ; srcY
-
-    ; -------------------------------------------------
-    ; WskaŸnik Ÿród³owy: 
-    ;   sourcePtr = bitmapPhoto + ((srcY * originalWidth) + srcX) * 3
-    ; -------------------------------------------------
-    mov     rax, [rsp +  0]    ; base = bitmapPhoto
-
-    mov     r8, rdi            ; r8 = srcY
-    imul    r8, [rsp +  8]     ; r8 *= originalWidth
-    imul    r8, 3
-    add     rax, r8            ; rax -> pocz¹tek wiersza
-
-    mov     r8, rsi            ; r8 = srcX
-    imul    r8, 3
-    add     rax, r8            ; rax -> (srcX) w tym wierszu
-
-    ; Zachowujemy wskaŸnik Ÿród³a w r10
-    mov     r10, rax
-
-    ; -------------------------------------------------
-    ; WskaŸnik docelowy:
-    ;   destPtr = resizedBitmap + (y * newRowSize) + (x * 3)
-    ; -------------------------------------------------
-    mov     rbx, [rsp + 56]    ; rbx = resizedBitmap
-
-    mov     r8, [rsp + 40]     ; r8 = newRowSize
-    imul    r8, rcx            ; y * newRowSize
-    add     rbx, r8            ; pocz¹tek wiersza docelowego
-
-    mov     r8, rdx            ; x
-    imul    r8, 3
-    add     rbx, r8            ; offset w wierszu
-
-    ; -------------------------------------------------
-    ; Kopiowanie 3 bajtów: B, G, R
-    ; -------------------------------------------------
-    movzx   rsi, byte ptr [r10]        ; B
-    mov     [rbx], sil
-    movzx   rsi, byte ptr [r10 + 1]    ; G
-    mov     [rbx + 1], sil
-    movzx   rsi, byte ptr [r10 + 2]    ; R
-    mov     [rbx + 2], sil
-
-    ; x++
-    inc     rdx
-    jmp     inner_loop
-
-end_inner_loop:
-    ; y++
-    inc     rcx
-    jmp     outer_loop
-
-end_outer_loop:
-    ; -----------------------------------------------------
-    ; Zwracamy wskaŸnik do nowego obrazu w RAX
-    ; -----------------------------------------------------
-    mov     rax, [rsp + 56]
-
-    ; -----------------------------------------------------
-    ; Epilog
-    ; -----------------------------------------------------
-    mov     rsp, rbp
-    pop     rbp
-    ret
-
-; -----------------------------------------------------
-; Obs³uga b³êdów:
-; -----------------------------------------------------
-error:
-    xor     rax, rax   ; RAX = 0 (NULL)
-    mov     rsp, rbp
-    pop     rbp
-    ret
+    end_function:
+        xor     eax, eax         ; return 0
+        add     rsp, 32          ; przywrócenie wskaŸnika stosu
+        ret
 
 ScaleImageAsm ENDP
+
 END
