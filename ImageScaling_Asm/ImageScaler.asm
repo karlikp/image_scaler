@@ -1,147 +1,261 @@
-; Definicja segmentu danych
+; ==============================
+; Sekcja danych
+; ==============================
 .DATA
-resizedBitmap QWORD ? ; Bufor dla nowego obrazu
+resizedBitmap QWORD ? ; Bufor dla nowego obrazu (opcjonalnie)
 
-; Deklaracje procedur
+; ==============================
+; Deklaracje procedur zewnêtrznych
+; ==============================
 EXTERN VirtualAlloc:PROC
 
-; Definicja segmentu kodu
+; ==============================
+; Sekcja kodu
+; ==============================
 .CODE
 
 PUBLIC ScaleImageAsm
 
+; -----------------------------------------------------------
 ; Funkcja: ScaleImageAsm
-; Argumenty:
-;   - bitmapPhoto: wskaŸnik do oryginalnego obrazu
-;   - originalWidth: szerokoœæ oryginalnego obrazu
-;   - originalHeight: wysokoœæ oryginalnego obrazu
-;   - newWidth: nowa szerokoœæ
-;   - newHeight: nowa wysokoœæ
-; Zwraca:
-;   - wskaŸnik do nowego, skalowanego obrazu lub NULL w przypadku b³êdu
+; -----------------------------------------------------------
+; Argumenty (Microsoft x64):
+;   RCX - bitmapPhoto       (wskaŸnik do oryginalnego obrazu)
+;   RDX - originalWidth     (szerokoœæ oryginalna, int)
+;   R8  - originalHeight    (wysokoœæ oryginalna, int)
+;   R9  - newWidth          (nowa szerokoœæ, int)
+;   (5-ty argument)         (newHeight, int) - na stosie
+;
+; Zak³adamy, ¿e prototyp w C++ to:
+;   extern "C" unsigned char* ScaleImageAsm(
+;       unsigned char* bitmapPhoto,
+;       int originalWidth,
+;       int originalHeight,
+;       int newWidth,
+;       int newHeight
+;   );
+;
+; Zwraca: 
+;   - wskaŸnik do nowego obrazu 
+;   - NULL (0), jeœli wyst¹pi³ b³¹d
+; -----------------------------------------------------------
 
 ScaleImageAsm PROC
-    ; Prolog funkcji
-    push rbp
-    mov rbp, rsp
-    sub rsp, 64                ; Alokacja miejsca na zmienne lokalne
+    ; -----------------------------------------------------
+    ; Prolog
+    ; -----------------------------------------------------
+    push    rbp
+    mov     rbp, rsp
+    sub     rsp, 64            ; rezerwujemy miejsce na zmienne lokalne
 
-    ; Pobranie argumentów
-    mov rax, [rbp + 16]        ; bitmapPhoto
-    mov [rsp + 0], rax
-    mov rax, [rbp + 24]        ; originalWidth
-    mov [rsp + 8], rax
-    mov rax, [rbp + 32]        ; originalHeight
-    mov [rsp + 16], rax
-    mov rax, [rbp + 40]        ; newWidth
-    mov [rsp + 24], rax
-    mov rax, [rbp + 48]        ; newHeight
-    mov [rsp + 32], rax
+    ; -----------------------------------------------------
+    ; Zapisujemy 4 g³ówne argumenty do pamiêci lokalnej
+    ; -----------------------------------------------------
+    mov     [rsp +  0], rcx    ; [rsp +  0] = bitmapPhoto
+    mov     [rsp +  8], rdx    ; [rsp +  8] = originalWidth
+    mov     [rsp + 16], r8     ; [rsp + 16] = originalHeight
+    mov     [rsp + 24], r9     ; [rsp + 24] = newWidth
 
-    ; Sprawdzenie warunków b³êdnych
-    cmp qword ptr [rsp + 0], 0 ; if (!bitmapPhoto)
-    je error
-    cmp qword ptr [rsp + 8], 0 ; if (originalWidth <= 0)
-    jle error
-    cmp qword ptr [rsp + 16], 0 ; if (originalHeight <= 0)
-    jle error
-    cmp qword ptr [rsp + 24], 0 ; if (newWidth <= 0)
-    jle error
-    cmp qword ptr [rsp + 32], 0 ; if (newHeight <= 0)
-    jle error
+    ; -----------------------------------------------------
+    ; Wczytanie 5. argumentu (newHeight, int)
+    ; UWAGA: W Windows x64 kolejne argumenty (po 4.) trafiaj¹ na stos.
+    ;        Dlatego musimy pobraæ *tylko* 32 bity z w³aœciwej pozycji.
+    ;        Je¿eli w C++ mamy 'int newHeight', to musimy zrobiæ mov eax, [rbp+?].
+    ; -----------------------------------------------------
 
-    ; Obliczenie newRowSize = (newWidth * 3 + 3) & ~3
-    mov rax, [rsp + 24]        ; newWidth
-    imul rax, 3                ; newWidth * 3
-    add rax, 3
-    and rax, 0FFFFFFFFFFFFFFFCh ; Wyrównanie do 4 bajtów
-    mov [rsp + 40], rax        ; newRowSize
+    ; Najczêœciej 5-ty argument (typu 32-bit int) jest w [rbp + 48],
+    ; ale to zale¿y od uk³adu stosu w czasie wywo³ania.
+    ; W praktyce, przy "push rbp / mov rbp, rsp", 
+    ;   [rbp +  0] = poprzedni RBP
+    ;   [rbp +  8] = adres powrotny
+    ;   [rbp + 16..] = home space/rejestry
+    ;   itd.
+    ;
+    ; Jeœli Twój kompilator/œrodowisko potwierdza, ¿e 5-ty argument
+    ; jest pod [rbp + 48], wczytujemy go tak:
+    ;
 
-    ; Obliczenie newPixelArraySize = newRowSize * newHeight
-    mov rbx, rax               ; newRowSize
-    mov rax, [rsp + 32]        ; newHeight
-    imul rax, rbx              ; newRowSize * newHeight
-    mov [rsp + 48], rax        ; newPixelArraySize
+    mov     eax, DWORD PTR [rbp + 48] ; za³aduj 32 bity newHeight do EAX
+    mov     [rsp + 32], rax           ; zapisz w [rsp+32] (jako int, z wyzerowan¹ gór¹ RAX)
 
-    ; Alokacja pamiêci dla resizedBitmap za pomoc¹ VirtualAlloc
-    push 64                  ; PAGE_READWRITE
-    push 4096                ; MEM_COMMIT
-    mov rax, [rsp + 48]      ; Rozmiar nowego bufora
-    push rax                 ; newPixelArraySize
-    push 0                   ; Brak konkretnego adresu bazowego (system wybierze)
-    call VirtualAlloc
-    test rax, rax            ; Sprawdzenie czy alokacja siê powiod³a
-    jz error
-    mov [rsp + 56], rax      ; resizedBitmap
+    ; ------------------------------
+    ; Sprawdzenie warunków b³êdnych (NULL, <= 0, itp.)
+    ; ------------------------------
 
-    ; Skalowanie obrazu (interpolacja najbli¿szego s¹siada)
-    xor rcx, rcx             ; y = 0
+    ; 1. bitmapPhoto (64-bit wskaŸnik), sprawdzamy != NULL
+    mov   rax, [rsp +  0]    ; wczytujemy wskaŸnik
+    test  rax, rax           ; sprawdzamy, czy jest równy 0
+    jz    error              ; jeœli 0 -> b³¹d
+
+    ; 2. originalWidth (32-bit int), sprawdzamy > 0
+    mov   eax, [rsp +  8]    ; wczytujemy 32 bity do EAX
+    test  eax, eax           ; sprawdzamy znak i zero
+    jle   error              ; jeœli <= 0 -> b³¹d
+
+    ; 3. originalHeight (32-bit int), sprawdzamy > 0
+    mov   eax, [rsp + 16]
+    test  eax, eax
+    jle   error
+
+    ; 4. newWidth (32-bit int), sprawdzamy > 0
+    mov   eax, [rsp + 24]
+    test  eax, eax
+    jle   error
+
+    ; 5. newHeight (32-bit int), sprawdzamy > 0
+    mov   eax, [rsp + 32]
+    test  eax, eax
+    jle   error
+
+    ; -----------------------------------------------------
+    ; newRowSize = (newWidth * 3 + 3) & ~3
+    ; -----------------------------------------------------
+    mov     rax, [rsp + 24]    ; RAX = newWidth
+    imul    rax, 3             ; RAX = newWidth * 3
+    add     rax, 3
+    and     rax, -4            ; wyrównanie w dó³ (do wielokrotnoœci 4)
+    mov     [rsp + 40], rax    ; newRowSize
+
+    ; -----------------------------------------------------
+    ; newPixelArraySize = newRowSize * newHeight
+    ; -----------------------------------------------------
+    mov     rbx, rax           ; rbx = newRowSize
+    mov     rax, [rsp + 32]    ; rax = newHeight
+    imul    rax, rbx           ; rax = newRowSize * newHeight
+    test    rax, rax
+    jle     error
+
+    mov     [rsp + 48], rax    ; newPixelArraySize
+
+    ; -----------------------------------------------------
+    ; Wywo³anie VirtualAlloc (alokacja pamiêci)
+    ; W MS x64 parametry s¹ w rejestrach: rcx, rdx, r8, r9
+    ;
+    ; LPVOID VirtualAlloc(
+    ;     LPVOID lpAddress,    // rcx
+    ;     SIZE_T dwSize,       // rdx
+    ;     DWORD  flAllocationType, // r8
+    ;     DWORD  flProtect     // r9
+    ; );
+    ; -----------------------------------------------------
+    sub     rsp, 32            ; shadow space (zalecane)
+    mov     rcx, 0             ; lpAddress = NULL
+    mov     rdx, rax           ; dwSize = newPixelArraySize
+    mov     r8,  4096          ; MEM_COMMIT
+    mov     r9,  64            ; PAGE_READWRITE
+    call    VirtualAlloc
+    add     rsp, 32
+
+    test    rax, rax
+    jz      error
+
+    ; Zapisujemy wskaŸnik do zaalokowanej pamiêci
+    mov     [rsp + 56], rax    ; resizedBitmap
+
+    ; -----------------------------------------------------
+    ; Skalowanie metod¹ najbli¿szego s¹siada
+    ; -----------------------------------------------------
+    xor     rcx, rcx           ; y = 0
+
 outer_loop:
-    cmp rcx, [rsp + 32]      ; y < newHeight
-    jge end_outer_loop
+    cmp     rcx, [rsp + 32]    ; y < newHeight ?
+    jge     end_outer_loop
 
-    xor rdx, rdx             ; x = 0
+    xor     rdx, rdx           ; x = 0
+
 inner_loop:
-    cmp rdx, [rsp + 24]      ; x < newWidth
-    jge end_inner_loop
+    cmp     rdx, [rsp + 24]    ; x < newWidth ?
+    jge     end_inner_loop
 
-    ; Obliczenie srcX = (x * originalWidth) / newWidth
-    mov rax, rdx             ; x
-    imul rax, [rsp + 8]      ; x * originalWidth
+    ; ---------------------------
+    ; srcX = (x * originalWidth) / newWidth
+    ; ---------------------------
+    mov     rax, rdx
+    imul    rax, [rsp +  8]    ; x * originalWidth
     cqo
-    idiv qword ptr [rsp + 24] ; (x * originalWidth) / newWidth
-    mov rsi, rax             ; srcX
+    idiv    qword ptr [rsp + 24]  ; / newWidth
+    mov     rsi, rax           ; srcX
 
-    ; Obliczenie srcY = (y * originalHeight) / newHeight
-    mov rax, rcx             ; y
-    imul rax, [rsp + 16]     ; y * originalHeight
+    ; ---------------------------
+    ; srcY = (y * originalHeight) / newHeight
+    ; ---------------------------
+    mov     rax, rcx
+    imul    rax, [rsp + 16]    ; y * originalHeight
     cqo
-    idiv qword ptr [rsp + 32] ; (y * originalHeight) / newHeight
-    mov rdi, rax             ; srcY
+    idiv    qword ptr [rsp + 32]  ; / newHeight
+    mov     rdi, rax           ; srcY
 
-    ; Obliczenie wskaŸnika do piksela Ÿród³owego
-    mov rax, [rsp + 0]       ; bitmapPhoto
-    mov rbx, [rsp + 8]       ; originalWidth
-    imul rdi, rbx            ; srcY * originalWidth
-    imul rdi, 3              ; (srcY * originalWidth) * 3
-    add rax, rdi
-    lea rax, [rax + rsi * 2] ; bitmapPhoto + srcY * originalWidth * 2
-    add rax, rsi             ; bitmapPhoto + srcY * originalWidth * 3
+    ; -------------------------------------------------
+    ; WskaŸnik Ÿród³owy: 
+    ;   sourcePtr = bitmapPhoto + ((srcY * originalWidth) + srcX) * 3
+    ; -------------------------------------------------
+    mov     rax, [rsp +  0]    ; base = bitmapPhoto
 
-    ; Obliczenie wskaŸnika do piksela docelowego
-    mov rbx, [rsp + 56]      ; resizedBitmap
-    mov rdi, [rsp + 40]      ; newRowSize
-    imul rcx, rdi            ; y * newRowSize
-    lea rbx, [rbx + rcx]      ; resizedBitmap + y * newRowSize
-    lea rax, [rdx + rdx * 2]  ; rdx * 3
-    add rbx, rax              ; resizedBitmap + y * newRowSize + x * 3
+    mov     r8, rdi            ; r8 = srcY
+    imul    r8, [rsp +  8]     ; r8 *= originalWidth
+    imul    r8, 3
+    add     rax, r8            ; rax -> pocz¹tek wiersza
 
+    mov     r8, rsi            ; r8 = srcX
+    imul    r8, 3
+    add     rax, r8            ; rax -> (srcX) w tym wierszu
 
-    ; Kopiowanie piksela (BGR)
-    movzx rsi, byte ptr [rax]      ; Blue
-    mov [rbx], sil
-    movzx rsi, byte ptr [rax + 1]  ; Green
-    mov [rbx + 1], sil
-    movzx rsi, byte ptr [rax + 2]  ; Red
-    mov [rbx + 2], sil
+    ; Zachowujemy wskaŸnik Ÿród³a w r10
+    mov     r10, rax
 
-    inc rdx                  ; x++
-    jmp inner_loop
+    ; -------------------------------------------------
+    ; WskaŸnik docelowy:
+    ;   destPtr = resizedBitmap + (y * newRowSize) + (x * 3)
+    ; -------------------------------------------------
+    mov     rbx, [rsp + 56]    ; rbx = resizedBitmap
+
+    mov     r8, [rsp + 40]     ; r8 = newRowSize
+    imul    r8, rcx            ; y * newRowSize
+    add     rbx, r8            ; pocz¹tek wiersza docelowego
+
+    mov     r8, rdx            ; x
+    imul    r8, 3
+    add     rbx, r8            ; offset w wierszu
+
+    ; -------------------------------------------------
+    ; Kopiowanie 3 bajtów: B, G, R
+    ; -------------------------------------------------
+    movzx   rsi, byte ptr [r10]        ; B
+    mov     [rbx], sil
+    movzx   rsi, byte ptr [r10 + 1]    ; G
+    mov     [rbx + 1], sil
+    movzx   rsi, byte ptr [r10 + 2]    ; R
+    mov     [rbx + 2], sil
+
+    ; x++
+    inc     rdx
+    jmp     inner_loop
+
 end_inner_loop:
-    inc rcx                  ; y++
-    jmp outer_loop
-end_outer_loop:
+    ; y++
+    inc     rcx
+    jmp     outer_loop
 
-    ; Epilog funkcji
-    mov rax, [rsp + 56]      ; Zwracamy wskaŸnik na dane obrazu
-    mov rsp, rbp
-    pop rbp
+end_outer_loop:
+    ; -----------------------------------------------------
+    ; Zwracamy wskaŸnik do nowego obrazu w RAX
+    ; -----------------------------------------------------
+    mov     rax, [rsp + 56]
+
+    ; -----------------------------------------------------
+    ; Epilog
+    ; -----------------------------------------------------
+    mov     rsp, rbp
+    pop     rbp
     ret
 
+; -----------------------------------------------------
+; Obs³uga b³êdów:
+; -----------------------------------------------------
 error:
-    mov rax, 0               ; Zwracamy NULL w przypadku b³êdu
-    mov rsp, rbp
-    pop rbp
+    xor     rax, rax   ; RAX = 0 (NULL)
+    mov     rsp, rbp
+    pop     rbp
     ret
 
 ScaleImageAsm ENDP

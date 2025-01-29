@@ -4,15 +4,13 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 17.8.34330.188
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ImageScaling_Cpp", "ImageScaling_Cpp\ImageScaling_Cpp.vcxproj", "{FBF959C7-A1A4-4E0D-9935-790596A503D3}"
-	ProjectSection(ProjectDependencies) = postProject
-		{EDDDD062-2149-4E94-BC49-4A1F76BC3DCB} = {EDDDD062-2149-4E94-BC49-4A1F76BC3DCB}
-	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ImageScaling_Asm", "ImageScaling_Asm\ImageScaling_Asm.vcxproj", "{EDDDD062-2149-4E94-BC49-4A1F76BC3DCB}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImageScaling", "ImageScaling\ImageScaling.csproj", "{3F61B5A1-CEA5-4055-A164-DD380FBC2C83}"
 	ProjectSection(ProjectDependencies) = postProject
 		{EDDDD062-2149-4E94-BC49-4A1F76BC3DCB} = {EDDDD062-2149-4E94-BC49-4A1F76BC3DCB}
+		{FBF959C7-A1A4-4E0D-9935-790596A503D3} = {FBF959C7-A1A4-4E0D-9935-790596A503D3}
 	EndProjectSection
 EndProject
 Global

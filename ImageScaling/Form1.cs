@@ -11,13 +11,14 @@ namespace ImageScaling
         //[DllImport("C:\\Users\\Ryzen\\Desktop\\Git_repos\\JA_proj\\x64\\Debug\\ImageScaling_Cpp.dll")]
         //public static extern void BoxBlurAsm();
 
-        [DllImport("C:\\Users\\Ryzen\\Desktop\\Git_repos\\image_scaler\\x64\\Debug\\ImageScaling_Cpp.dll")]
+        [DllImport("C:\\Users\\piter\\Desktop\\Git_repos\\image_scaler\\x64\\Debug\\ImageScaling_Cpp.dll", CallingConvention = CallingConvention.Cdecl)]
+       
         public static extern IntPtr ScaleImageCpp(byte[] bitmapPhoto, int originalWidth, int originalHeight, int newWidth, int newHeight);
 
-        [DllImport("C:\\Users\\Ryzen\\Desktop\\Git_repos\\image_scaler\\x64\\Debug\\ImageScaling_Cpp.dll")]
+        [DllImport("C:\\Users\\piter\\Desktop\\Git_repos\\image_scaler\\x64\\Debug\\ImageScaling_Cpp.dll")]
         public static extern void FreeImageMemory(IntPtr memory);
 
-        [DllImport(@"C:\Users\Ryzen\Desktop\Git_repos\image_scaler\x64\Debug\ImageScaling_Asm.dll ")]
+        [DllImport(@"C:\Users\piter\Desktop\Git_repos\image_scaler\x64\Debug\ImageScaling_Asm.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern IntPtr ScaleImageAsm(byte[] bitmapPhoto, int originalWidth, int originalHeight, int newWidth, int newHeight);
 
 
