@@ -228,6 +228,7 @@
             this.btmExit.TabIndex = 38;
             this.btmExit.Text = "Exit from program";
             this.btmExit.UseVisualStyleBackColor = true;
+            this.btmExit.Click += new System.EventHandler(this.btmExit_Click);
             // 
             // labelInfo5
             // 
@@ -279,6 +280,7 @@
             this.labelCppTime.Size = new System.Drawing.Size(70, 22);
             this.labelCppTime.TabIndex = 43;
             this.labelCppTime.Text = "no data";
+            this.labelCppTime.Click += new System.EventHandler(this.labelCppTime_Click);
             // 
             // labelDifferenceTime
             // 

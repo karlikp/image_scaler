@@ -73,7 +73,6 @@ namespace ImageScaling
                 }
             }
 
-
         }
 
         void saveImage()
@@ -105,17 +104,6 @@ namespace ImageScaling
         }
 
 
-        private Bitmap ScaleBitmap(Bitmap bitmap, int newWidth, int newHeight)
-        {
-            Bitmap scaledBitmap = new Bitmap(newWidth, newHeight);
-            using (Graphics g = Graphics.FromImage(scaledBitmap))
-            {
-                g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
-                g.DrawImage(bitmap, 0, 0, newWidth, newHeight);
-            }
-            return scaledBitmap;
-        }
-
         private void btnFormatPhoto_Click(object sender, EventArgs e)
         {
             int.TryParse(widthTextBox.Text, out newWidth);
@@ -138,6 +126,18 @@ namespace ImageScaling
             {
                 FormatAsm();
             }
+
+            if (labelAsmTime.Text != "no data" && labelCppTime.Text != "no data")
+            {
+                if (long.TryParse(labelAsmTime.Text, out long asmTime) && long.TryParse(labelCppTime.Text, out long cppTime))
+                {
+                    labelDifferenceTime.Text = (Math.Abs(cppTime - asmTime)).ToString();
+                }
+                else
+                {
+                    labelDifferenceTime.Text = "Invalid input";
+                }
+            }
         }
 
         private void FormatCpp()
@@ -154,7 +154,7 @@ namespace ImageScaling
 
                 stopwatch.Stop();
 
-                double elapsedMicroseconds = stopwatch.ElapsedTicks / (Stopwatch.Frequency / 1_000_000.0);
+                long elapsedMicroseconds = (long)Math.Round(stopwatch.ElapsedTicks / (Stopwatch.Frequency / 1_000_000.0));
                 labelCppTime.Text = elapsedMicroseconds.ToString();
 
                 if (result != IntPtr.Zero)
@@ -223,8 +223,8 @@ namespace ImageScaling
                     // (można wyzerować outputPtr, ale ASM i tak nadpisze dane)
 
                     // 5) Wywołujemy funkcję ASM
-                    Stopwatch sw = new Stopwatch();
-                    sw.Start();
+                    Stopwatch stopwatch = new Stopwatch();
+                    stopwatch.Start();
 
                     ScaleImageAsm(
                         inputPtr,    // #1
@@ -235,8 +235,8 @@ namespace ImageScaling
                         newHeight    // #6
                     );
 
-                    sw.Stop();
-                    double elapsedMicroseconds = sw.ElapsedTicks / (Stopwatch.Frequency / 1_000_000.0);
+                    stopwatch.Stop();
+                    long elapsedMicroseconds = (long)Math.Round(stopwatch.ElapsedTicks / (Stopwatch.Frequency / 1_000_000.0));
                     labelAsmTime.Text = elapsedMicroseconds.ToString();
 
                     // 6) Kopiujemy wynik do zarządzanej tablicy
@@ -385,11 +385,6 @@ namespace ImageScaling
 
         }
 
-        private void label2_Click(object sender, EventArgs e)
-        {
-
-        }
-
         private void label3_Click(object sender, EventArgs e)
         {
 
@@ -400,10 +395,6 @@ namespace ImageScaling
 
         }
 
-        private void textBox6_TextChanged(object sender, EventArgs e)
-        {
-
-        }
 
         private void label12_Click(object sender, EventArgs e)
         {
@@ -434,115 +425,7 @@ namespace ImageScaling
             }
         }
 
-
-
-
-        // == Deklaracje z DLL asm ==
-        // Załóżmy, że skompilowałeś do "ImageScaling_Asm.dll"
-        // i używasz standardowej konwencji C (Cdecl) w Windows x64.
-     
-
-    
-
-        private const int MEM_RELEASE = 0x8000;
-
-        //private void Main()
-        //{
-        //    // 1) Wczytujemy obraz JPEG z pliku
-        //    //string inputPath = "test.jpg";
-        //    string outputPath = "nowyobraz.jpg";
-
-        //    //if (!File.Exists(inputPath))
-        //    //{
-        //    //    Console.WriteLine($"Błąd: Plik '{inputPath}' nie istnieje.");
-        //    //    return;
-        //    //}
-
-        //    //bitmapPhoto = new Bitmap(pathPhoto);
-        //    //currentWidth.Text = (bitmapPhoto.Width).ToString();
-        //    //currentHeight.Text = (bitmapPhoto.Height).ToString();
-
-        //    //using (Bitmap bmpInput = new Bitmap(inputPath))
-
-        //    {
-        //        // Upewniamy się, że mamy 24 bity na piksel (bez kanału alfa).
-        //        // Można zrobić konwersję przez:
-        //        using (Bitmap bmp24 = ConvertTo24bpp(bitmapPhoto))
-        //        {
-        //            int originalWidth = bmp24.Width;
-        //            int originalHeight = bmp24.Height;
-
-        //            // Nowe wymiary docelowe
-        //            int newWidth = originalWidth / 2;   // Przykładowo o połowę
-        //            int newHeight = originalHeight / 2; // ...
-
-        //            // 2) Zrzucamy dane z Bitmapy do tablicy bajtów w formacie BGR (24bpp)
-        //            byte[] originalData = BitmapTo24bppArray(bmp24, out int rowSize);
-
-        //            // UWAGA: rowSize to faktyczna liczba bajtów na wiersz w tym, 
-        //            //        jak .NET przechowuje dane (może być zaokrąglone do wielokrotności 4).
-        //            //        Jednak nasz kod ASM sam oblicza (newWidth*3 + 3)&~3 dla docelowego obrazu. 
-        //            //        Dla oryginału nie zawsze musimy mieć (width*3 + 3)&~3 – 
-        //            //        ważne, by w tablicy były zapisy wiersz po wierszu, BGR bez odstępów.
-
-        //            // 3) Alokujemy pamięć niezarządzaną i kopiujemy do niej dane
-        //            int originalSize = originalData.Length;
-        //            IntPtr originalPtr = Marshal.AllocHGlobal(originalSize);
-        //            Marshal.Copy(originalData, 0, originalPtr, originalSize);
-
-        //            // 4) Wywołujemy naszą funkcję asm
-        //            //IntPtr resizedPtr = ScaleImageAsm(
-        //            //    originalPtr,
-        //            //    originalWidth,
-        //            //    originalHeight,
-        //            //    newWidth,
-        //            //    newHeight
-        //            //);
-
-        //            // Sprawdzamy, czy funkcja nie zwróciła 0 (NULL)
-        //            if (resizedPtr == IntPtr.Zero)
-        //            {
-        //                Console.WriteLine("ScaleImageAsm zwrócił NULL (błąd).");
-        //            }
-        //            else
-        //            {
-        //                // 5) Obliczamy rozmiar nowego obrazu
-        //                //    newRowSize = (newWidth * 3 + 3) & ~3 (z kodu ASM)
-        //                int newRowSize = (newWidth * 3 + 3) & ~3;
-        //                int newPixelArraySize = newRowSize * newHeight;
-
-        //                // 6) Kopiujemy dane z powrotem do tablicy .NET
-        //                byte[] resizedData = new byte[newPixelArraySize];
-        //                Marshal.Copy(resizedPtr, resizedData, 0, newPixelArraySize);
-
-        //                // 7) Tworzymy nowy Bitmap 24bpp z wyniku
-        //                using (Bitmap bmpOutput = ArrayTo24bppBitmap(resizedData, newWidth, newHeight, newRowSize))
-        //                {
-        //                    // 8) Zapisujemy do pliku
-        //                    bmpOutput.Save(outputPath, ImageFormat.Jpeg);
-        //                    Console.WriteLine($"Zapisano wynik do {outputPath}");
-        //                }
-
-        //                // Zwolnienie pamięci zaalokowanej przez VirtualAlloc w ASM
-        //                bool freed = VirtualFree(resizedPtr, IntPtr.Zero, MEM_RELEASE);
-        //                if (!freed)
-        //                {
-        //                    Console.WriteLine("Błąd zwalniania pamięci z VirtualAlloc!");
-        //                }
-        //            }
-
-        //            // Zwolnienie oryginalnej pamięci z AllocHGlobal
-        //            Marshal.FreeHGlobal(originalPtr);
-        //        }
-        //    }
-
-        //    Console.WriteLine("Test zakończony.");
-        //    Console.ReadKey();
-        //}
-
-        /// <summary>
-        /// Konwertuje dowolny Bitmap do 24-bitowego formatu BGR.
-        /// </summary>
+        
         private static Bitmap ConvertTo24bpp(Bitmap source)
         {
             if (source.PixelFormat == PixelFormat.Format24bppRgb)
@@ -558,75 +441,14 @@ namespace ImageScaling
             }
             return bmp24;
         }
-
-        /// <summary>
-        /// Zwraca tablicę bajtów (BGR) o rozmiarze (height * stride), 
-        /// gdzie stride to liczba bajtów na wiersz (wyrównana do 4).
-        /// </summary>
-        private static byte[] BitmapTo24bppArray(Bitmap bmp, out int stride)
+        private void labelCppTime_Click(object sender, EventArgs e)
         {
-            if (bmp.PixelFormat != PixelFormat.Format24bppRgb)
-                throw new ArgumentException("Bitmap musi być w formacie 24bpp.");
 
-            BitmapData bd = null;
-            try
-            {
-                bd = bmp.LockBits(
-                    new Rectangle(0, 0, bmp.Width, bmp.Height),
-                    ImageLockMode.ReadOnly,
-                    PixelFormat.Format24bppRgb
-                );
-
-                stride = bd.Stride;  // liczba bajtów w jednym wierszu
-                int totalBytes = stride * bmp.Height;
-                byte[] data = new byte[totalBytes];
-
-                // Kopiujemy z pamięci obrazu do tablicy
-                Marshal.Copy(bd.Scan0, data, 0, totalBytes);
-                return data;
-            }
-            finally
-            {
-                if (bd != null)
-                    bmp.UnlockBits(bd);
-            }
         }
 
-        /// <summary>
-        /// Tworzy nowy Bitmap 24bpp z tablicy bajtów (BGR) o zadanym stride i rozmiarach.
-        /// </summary>
-        private static Bitmap ArrayTo24bppBitmap(byte[] data, int width, int height, int stride)
+        private void btmExit_Click(object sender, EventArgs e)
         {
-            Bitmap bmp = new Bitmap(width, height, PixelFormat.Format24bppRgb);
-            BitmapData bd = null;
-            try
-            {
-                bd = bmp.LockBits(
-                    new Rectangle(0, 0, width, height),
-                    ImageLockMode.WriteOnly,
-                    PixelFormat.Format24bppRgb
-                );
-
-                // Jeśli .NET obliczy inny stride niż nasz (co się może zdarzyć),
-                // musimy kopiować wierszami.
-                int bmpStride = bd.Stride;
-                int minStride = Math.Min(bmpStride, stride);
-                int bytesToCopy = Math.Min(minStride, width * 3);
-
-                for (int y = 0; y < height; y++)
-                {
-                    IntPtr destPtr = bd.Scan0 + y * bmpStride;
-                    int srcOffset = y * stride;
-                    Marshal.Copy(data, srcOffset, destPtr, bytesToCopy);
-                }
-            }
-            finally
-            {
-                if (bd != null)
-                    bmp.UnlockBits(bd);
-            }
-            return bmp;
+            Application.Exit();
         }
-
     }
 }
