@@ -11,27 +11,28 @@ namespace ImageScaling
 {
     public partial class Form1 : Form
     {
-        //[DllImport("C:\\Users\\Ryzen\\Desktop\\Git_repos\\JA_proj\\x64\\Debug\\ImageScaling_Cpp.dll")]
-        //public static extern void BoxBlurAsm();
-
         [DllImport("C:\\Users\\Ryzen\\Desktop\\Git_repos\\image_scaler\\x64\\Debug\\ImageScaling_Cpp.dll", CallingConvention = CallingConvention.Cdecl)]
-
-        public static extern IntPtr ScaleImageCpp(byte[] bitmapPhoto, int originalWidth, int originalHeight, int newWidth, int newHeight);
+        
+        public static extern IntPtr ScaleImageCpp(
+            byte[] bitmapPhoto, 
+            int originalWidth, 
+            int originalHeight, 
+            int newWidth,
+            int newHeight
+            );
 
         [DllImport("C:\\Users\\Ryzen\\Desktop\\Git_repos\\image_scaler\\x64\\Debug\\ImageScaling_Cpp.dll")]
         public static extern void FreeImageMemory(IntPtr memory);
 
-        [DllImport("kernel32.dll", SetLastError = true, CallingConvention = CallingConvention.Winapi)]
-        private static extern bool VirtualFree(IntPtr lpAddress, IntPtr dwSize, int dwFreeType);
-
         [DllImport("C:\\Users\\Ryzen\\Desktop\\Git_repos\\image_scaler\\x64\\Debug\\ImageScaling_Asm.dll", CallingConvention = CallingConvention.Cdecl)]
+       
         private static extern void ScaleImageAsm(
-            IntPtr inputPtr,       // (1) wskaźnik na piksele wejściowe
-            IntPtr outputPtr,      // (2) wskaźnik na bufor wyjściowy
-            int iWidth,        // (3) szerokość wejściowa
-            int iHeight,       // (4) wysokość wejściowa
-            int oWidth,       // (5) szerokość docelowa
-            int oHeight       // (6) wysokość docelowa
+            IntPtr inputPtr,       
+            IntPtr outputPtr,      
+            int iWidth,        
+            int iHeight,       
+            int oWidth,       
+            int oHeight       
         );
 
         public Form1()
@@ -59,7 +60,7 @@ namespace ImageScaling
 
                 try
                 {
-                    // Wczytanie obrazu w różnych formatach jako Bitmap
+                    // Load image in different formats as Bitmap
                     bitmapPhoto = new Bitmap(pathPhoto);
                     bitmapPhoto = ConvertTo24bpp(bitmapPhoto);
 
@@ -146,10 +147,11 @@ namespace ImageScaling
             {
                 byte[] inputPixels = BitmapToByteArray(bitmapPhoto);
 
+                //check time
                 Stopwatch stopwatch = new Stopwatch();
                 stopwatch.Start();
 
-                // Wywołanie funkcji DLL
+                // call DLL function
                 IntPtr result = ScaleImageCpp(inputPixels, bitmapPhoto.Width, bitmapPhoto.Height, newWidth, newHeight);
 
                 stopwatch.Stop();
@@ -159,17 +161,17 @@ namespace ImageScaling
 
                 if (result != IntPtr.Zero)
                 {
-                    // Alokacja tablicy bajtów w C#
-                    int outputSize = (newWidth * newHeight * 3); // Assuming 24bpp BGR format
+                    // Assuming 24bpp BGR format
+                    int outputSize = (newWidth * newHeight * 3); 
                     byte[] outputPixels = new byte[outputSize];
 
-                    // Kopiowanie danych z niezarządzanej pamięci
+                    // Copying data from unmanaged memory
                     Marshal.Copy(result, outputPixels, 0, outputSize);
 
-                    // Konwersja na obiekt Bitmap
+                    // Convertion Bitmap
                     bitmapScaled = ByteArrayToBitmap(outputPixels, newWidth, newHeight);
 
-                    // Zwolnienie pamięci po stronie C++
+                    // Freeing memory on the C++ side
                     FreeImageMemory(result);
 
                     MessageBox.Show("Image scaled successfully using C++.");
@@ -196,57 +198,57 @@ namespace ImageScaling
                     return;
                 }
 
-                // Wczytujemy docelowe wymiary z TextBox (np. newWidth, newHeight)
+                // Lload target dimensions from TextBox (e.g. newWidth, newHeight)
                 if (newWidth <= 0 || newHeight <= 0)
                 {
                     MessageBox.Show("Invalid target dimensions.");
                     return;
                 }
 
-                // 1) Konwertujemy do 32bpp
+                // Convert to Bitmap
                 using (Bitmap bmp32 = ConvertTo32bpp(bitmapPhoto))
                 {
                     int iWidth = bmp32.Width;
                     int iHeight = bmp32.Height;
 
-                    // 2) Pobieramy spłaszczone dane (4 bajty/piksel, bez stride)
+                    // Download flattened data (4 bytes/pixel, no stride)
                     byte[] inputData = BitmapTo32bppArrayFlattened(bmp32);
 
-                    // 3) Alokujemy pamięć dla inputu
+                    // Allocation memory for input
                     IntPtr inputPtr = Marshal.AllocHGlobal(inputData.Length);
                     Marshal.Copy(inputData, 0, inputPtr, inputData.Length);
 
-                    // 4) Alokujemy pamięć dla outputu (newWidth * newHeight * 4)
+                    // Allocation memory for output (newWidth * newHeight * 4) 
                     int outputSize = newWidth * newHeight * 4;
                     IntPtr outputPtr = Marshal.AllocHGlobal(outputSize);
 
-                    // (można wyzerować outputPtr, ale ASM i tak nadpisze dane)
 
-                    // 5) Wywołujemy funkcję ASM
                     Stopwatch stopwatch = new Stopwatch();
                     stopwatch.Start();
 
                     ScaleImageAsm(
-                        inputPtr,    // #1
-                        outputPtr,   // #2
-                        iWidth,      // #3
-                        iHeight,     // #4
-                        newWidth,    // #5
-                        newHeight    // #6
+                        inputPtr,    
+                        outputPtr,   
+                        iWidth,      
+                        iHeight,     
+                        newWidth,    
+                        newHeight    
                     );
 
                     stopwatch.Stop();
                     long elapsedMicroseconds = (long)Math.Round(stopwatch.ElapsedTicks / (Stopwatch.Frequency / 1_000_000.0));
+
+                    //time in microseconds
                     labelAsmTime.Text = elapsedMicroseconds.ToString();
 
-                    // 6) Kopiujemy wynik do zarządzanej tablicy
+                    // Copying the result to the managed table
                     byte[] outputData = new byte[outputSize];
                     Marshal.Copy(outputPtr, outputData, 0, outputSize);
 
-                    // 7) Tworzymy Bitmapę 32bpp ze spłaszczonych danych
+                    // Creating a Bitmap from flattened data
                     bitmapScaled = ArrayTo32bppBitmapFlattened(outputData, newWidth, newHeight);
 
-                    // 8) Zwalniamy wskaźniki
+                    // Release the indicators
                     Marshal.FreeHGlobal(inputPtr);
                     Marshal.FreeHGlobal(outputPtr);
 
@@ -271,7 +273,7 @@ namespace ImageScaling
                     ImageLockMode.WriteOnly,
                     bmp.PixelFormat
                 );
-                int stride = bd.Stride;  // może być >= width * 4
+                int stride = bd.Stride;  
                 IntPtr dstScan0 = bd.Scan0;
 
                 int bytesPerPixel = 4;
@@ -280,7 +282,6 @@ namespace ImageScaling
                     IntPtr dstPtr = dstScan0 + y * stride;
                     int srcOffset = y * (width * bytesPerPixel);
 
-                    // Kopiujemy (width * 4) bajtów na wiersz
                     Marshal.Copy(data, srcOffset, dstPtr, width * bytesPerPixel);
                 }
             }
@@ -312,17 +313,16 @@ namespace ImageScaling
                     ImageLockMode.ReadOnly,
                     bmp.PixelFormat
                 );
-                int stride = bd.Stride; // może być >= width*4
+                int stride = bd.Stride; 
                 IntPtr scan0 = bd.Scan0;
 
                 for (int y = 0; y < height; y++)
                 {
-                    // Adres w pamięci oryginalnego wiersza
+                   
                     IntPtr srcPtr = scan0 + y * stride;
-                    // Pozycja w wynikowej tablicy (bez paddingu)
+                    
                     int dstOffset = y * (width * bytesPerPixel);
 
-                    // Kopiujemy (width * 4) bajtów
                     Marshal.Copy(srcPtr, result, dstOffset, width * bytesPerPixel);
                 }
             }
@@ -335,14 +335,14 @@ namespace ImageScaling
 
         private static Bitmap ConvertTo32bpp(Bitmap source)
         {
-            // Jeśli już jest 32bpp, to tylko klonujemy
+            // If it is already 32bpp, we just clone
             if (source.PixelFormat == PixelFormat.Format32bppArgb ||
                 source.PixelFormat == PixelFormat.Format32bppRgb)
             {
                 return new Bitmap(source);
             }
 
-            // Inaczej konwertujemy do 32bpp (bez kanału alfa -> Format32bppRgb)
+            // Otherwise we convert to 32bpp (without alpha channel -> Format32bppRgb)
             Bitmap bmp32 = new Bitmap(source.Width, source.Height, PixelFormat.Format32bppRgb);
             using (Graphics g = Graphics.FromImage(bmp32))
             {
@@ -379,27 +379,10 @@ namespace ImageScaling
 
             return bitmap;
         }
-
-        private void Form1_Load(object sender, EventArgs e)
-        {
-
-        }
-
-        private void label3_Click(object sender, EventArgs e)
-        {
-
-        }
-
-        private void label10_Click(object sender, EventArgs e)
-        {
-
-        }
-
-
-        private void label12_Click(object sender, EventArgs e)
-        {
-        }
-
+        private void Form1_Load(object sender, EventArgs e) { }
+        private void label3_Click(object sender, EventArgs e){ }
+        private void label10_Click(object sender, EventArgs e){ }
+        private void label12_Click(object sender, EventArgs e) { }
         private void checkBox_Cpp_CheckedChanged(object sender, EventArgs e)
         {
             if (checkBoxCpp.Checked)
@@ -412,7 +395,6 @@ namespace ImageScaling
             }
 
         }
-
         private void checkBox_Asm_CheckedChanged(object sender, EventArgs e)
         {
             if (checkBoxAsm.Checked)
@@ -424,16 +406,12 @@ namespace ImageScaling
                 AsmCheck = false;
             }
         }
-
-        
         private static Bitmap ConvertTo24bpp(Bitmap source)
         {
             if (source.PixelFormat == PixelFormat.Format24bppRgb)
-            {
-                // Już jest 24 bpp
+            { 
                 return new Bitmap(source);
             }
-            // Inaczej konwertujemy
             Bitmap bmp24 = new Bitmap(source.Width, source.Height, PixelFormat.Format24bppRgb);
             using (Graphics g = Graphics.FromImage(bmp24))
             {
@@ -441,11 +419,7 @@ namespace ImageScaling
             }
             return bmp24;
         }
-        private void labelCppTime_Click(object sender, EventArgs e)
-        {
-
-        }
-
+        private void labelCppTime_Click(object sender, EventArgs e) { }
         private void btmExit_Click(object sender, EventArgs e)
         {
             Application.Exit();

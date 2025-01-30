@@ -3,17 +3,17 @@
 
 #include <vector>
 
-// Makro do eksportowania/importowania funkcji w bibliotece DLL/SLL
+// Macro to export/import functions in DLL/SLL library
 #ifdef IMAGE_SCALER_EXPORTS
 #define IMAGE_SCALER_API __declspec(dllexport)
 #else
 #define IMAGE_SCALER_API __declspec(dllimport)
 #endif
 
-// Deklaracja funkcji skaluj¹cej obraz
+// Declaration of the image scaling function
 extern "C" IMAGE_SCALER_API uint8_t * ScaleImageCpp(uint8_t * bitmapPhoto, int originalWidth, int originalHeight, int newWidth, int newHeight);
 
-// Deklaracja funkcji do zwalniania pamiêci alokowanej w DLL
+// Declaration of a function to free memory allocated in a DLL
 extern "C" IMAGE_SCALER_API void FreeImageMemory(uint8_t * memory);
 
 #endif // IMAGE_SCALER_H

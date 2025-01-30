@@ -11,17 +11,17 @@ extern "C" IMAGE_SCALER_API uint8_t * ScaleImageCpp(uint8_t * bitmapPhoto, int o
         return nullptr;
     }
 
-    int newRowSize = (newWidth * 3 + 3) & ~3; // wyrównanie do 4 bajtów
+    int newRowSize = (newWidth * 3 + 3) & ~3; // 4 byte alignment
     int newPixelArraySize = newRowSize * newHeight;
 
-    // Alokacja pamiêci dla nowego obrazu
+    // Memory allocation for new image
     unsigned char* resizedBitmap = new unsigned char[newPixelArraySize];
 
     if (!resizedBitmap) {
         return nullptr;
     }
 
-    // Skalowanie obrazu (prosta interpolacja najbli¿szego s¹siada)
+    // Image scaling (simple nearest neighbor interpolation)
     for (int y = 0; y < newHeight; ++y) {
         for (int x = 0; x < newWidth; ++x) {
             int srcX = static_cast<int>(x * originalWidth / static_cast<float>(newWidth));
@@ -35,7 +35,7 @@ extern "C" IMAGE_SCALER_API uint8_t * ScaleImageCpp(uint8_t * bitmapPhoto, int o
         }
     }
 
-    return resizedBitmap; // Zwracamy wskaŸnik na dane obrazu
+    return resizedBitmap; // Return a pointer to the image data
 }
 
 extern "C" IMAGE_SCALER_API void FreeImageMemory(uint8_t * memory) {

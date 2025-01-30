@@ -1,7 +1,4 @@
-﻿  pch.cpp
-  dllmain.cpp
-  ImageScaler.cpp
-  Generating Code...
+﻿  ImageScaler.cpp
   .NETFramework,Version=v4.7.2.AssemblyAttributes.cpp
      Creating library C:\Users\Ryzen\Desktop\Git_repos\image_scaler\x64\Debug\ImageScaling_Cpp.lib and object C:\Users\Ryzen\Desktop\Git_repos\image_scaler\x64\Debug\ImageScaling_Cpp.exp
   ImageScaling_Cpp.vcxproj -> C:\Users\Ryzen\Desktop\Git_repos\image_scaler\x64\Debug\ImageScaling_Cpp.dll

@@ -1,5 +1,5 @@
 ; ------------------------------------------------------------------------------
-; Mo¿esz wy³¹czyæ mapowanie wielkoœci liter, jeœli u¿ywasz MASM:
+; You can disable case mapping if you use MASM:
 option casemap:none
 
 .code
@@ -8,7 +8,7 @@ PUBLIC ScaleImageAsm
 
 ; ------------------------------------------------------------------------------
 ; ScaleImageAsm PROC
-; Parametry w MS x64 ABI:
+; Parameters in MS x64 ABI:
 ;   RCX -> input   (const uint32_t*)
 ;   RDX -> output  (uint32_t*)
 ;   R8  -> iWidth  (size_t)
@@ -18,20 +18,20 @@ PUBLIC ScaleImageAsm
 ; ------------------------------------------------------------------------------
 ScaleImageAsm PROC
 
-        ; Rezerwujemy 32 bajty shadow space (wymóg ABI Microsoft x64)
+        ; Reserve 32 bytes of shadow space (Microsoft x64 ABI requirement)
         sub     rsp, 32
 
-        ; Pobranie 5. i 6. argumentu ze stosu
+        ; Retrieve the 5th and 6th argument from the stack
         mov     r10d, [rbp + 48]      ; r10 = oWidth
         mov     r11d, [rbp + 56]      ; r11 = oHeight
 
-        ; Teraz chcemy odwzorowaæ stare rejestry:
-        ;   (stary kod zak³ada³: rdi=input, rsi=output, rdx=iWidth, rcx=iHeight, r8=oWidth, r9=oHeight)
+        ; Now we want to map the old registers:
+        ;   (the old code assumed: rdi=input, rsi=output, rdx=iWidth, rcx=iHeight, r8=oWidth, r9=oHeight)
         ;
-        ; W MS x64:
+        ; In MS x64:
         ;   RCX = input, RDX = output, R8 = iWidth, R9 = iHeight, r10 = oWidth, r11 = oHeight
         ;
-        ; Dlatego „przek³adamy” je w taki sposób:
+        ; So we "rearrange" them this way:
         mov     rdi, rcx    ; rdi = input
         mov     rsi, rdx    ; rsi = output
         mov     rdx, r8     ; iWidth
@@ -40,7 +40,7 @@ ScaleImageAsm PROC
         mov     r9,  r11    ; oHeight
 
         ; ------------------------------------------------------------------------------
-        ; Dalej kod mo¿e byæ niemal identyczny jak w wersji System V
+        ; From here on, the code can be almost identical to the System V version
         ; ------------------------------------------------------------------------------
         ; xRatio = float(iWidth) / oWidth
         cvtsi2ss xmm0, rdx       ; xmm0 = (float)iWidth
@@ -52,7 +52,7 @@ ScaleImageAsm PROC
         cvtsi2ss xmm3, r9        ; xmm3 = (float)oHeight
         divss   xmm2, xmm3       ; xmm2 = yRatio
 
-        ; r10 = y (pêtla zewnêtrzna)
+        ; r10 = y (outer loop)
         xor     r10, r10         ; y = 0
 
     outer_loop_y:
@@ -87,13 +87,13 @@ ScaleImageAsm PROC
         lea     r13, [rcx - 1]
     no_clamp_y:
 
-        ;3 Za³aduj pixel z input[nearestY * iWidth + nearestX]
+        ;3 Load pixel from input[nearestY * iWidth + nearestX]
         mov     rax, r13
         imul    rax, rdx
         add     rax, r12
         mov     ebx, DWORD PTR [rdi + rax*4]  ; ebx = input[...]
         
-        ;4 Zapisz pixel do output[y * oWidth + x]
+        ;4 Store pixel to output[y * oWidth + x]
         mov     rax, r10
         imul    rax, r8
         add     rax, r11
@@ -110,7 +110,7 @@ ScaleImageAsm PROC
 
     end_function:
         xor     eax, eax         ; return 0
-        add     rsp, 32          ; przywrócenie wskaŸnika stosu
+        add     rsp, 32          ; restore stack pointer
         ret
 
 ScaleImageAsm ENDP
